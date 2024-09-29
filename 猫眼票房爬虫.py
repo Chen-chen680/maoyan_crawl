@@ -14,7 +14,9 @@ def request_maoyan(year, save_path, sleep_time=1):
     '''
     if not save_path.endswith('xlsx'): raise TypeError('Only support excel: xlsx file')
     time.sleep(sleep_time)
-    url = f'https://piaofang.maoyan.com/rankings/year?year={year}&limit=600&tab=1'
+    tab = abs(int(year) - 2024) + 1
+    url = f'https://piaofang.maoyan.com/rankings/year?year={year}&limit=600&tab={tab}'
+    print(url)
     response = requests.get(url=url, headers=headers, timeout=10)
     if response.status_code != 200:
         raise ConnectionError(f"status code: {response.status_code} is not 200, break.")
@@ -31,7 +33,7 @@ def request_maoyan(year, save_path, sleep_time=1):
     titles = html.xpath(title_xpath)
 
     ids = html.xpath(ids_xpath)
-    if ids: ids = list(map(lambda x: x.replace(r"hrefTo,href:'/movie/", '').replace('.', ''), ids))
+    if ids: ids = list(map(lambda x: x.replace(r"hrefTo,href:'/movie/", '').replace("'", ''), ids))
 
     show_time = html.xpath(show_time_xpath)
     if show_time: show_time = list(map(lambda x: x.replace(r" 上映", ''), show_time))
@@ -56,4 +58,7 @@ def request_maoyan(year, save_path, sleep_time=1):
     output.to_excel(save_path, index=False)
 
 if __name__ == "__main__":
-    request_maoyan('2024', 'output.xlsx')
+    request_maoyan('2024', '2024.xlsx')
+    request_maoyan('2023', '2023.xlsx')
+    request_maoyan('2022', '2022.xlsx')
+    request_maoyan('2021', '2021.xlsx')
