@@ -2,13 +2,8 @@
 import requests
 from lxml import etree
 import xlsxwriter
-from concurrent.futures import ThreadPoolExecutor
-from fake_useragent import UserAgent
-ua = UserAgent()
-import sqlite3
-proxies = {
-    "http":"http://127.0.0.1:4780",
-}
+import os
+import time
 
 def get_movies(id, piaofang):
     url = 'https://piaofang.maoyan.com/movie/{}'.format(id)
@@ -24,9 +19,9 @@ def get_movies(id, piaofang):
         'Pragma': 'no-cache',
         'Cache-Control': 'no-cache',
     }
-    print(headers)
-    res = requests.get(url,headers=headers)
-    print(res.content)
+    # print(headers)
+    res = requests.get(url,headers=headers, timeout=90)
+    # print(res.content)
     html = etree.HTML(res.text)
     title = html.xpath('/html/body/div[2]/section[1]/div[1]/div[2]/div[1]/div[2]/div[1]/div[1]/p/span/text()')
     type = html.xpath('/html/body/div[2]/section[1]/div[1]/div[2]/div[1]/div[2]/div[2]/div[1]/div/p/text()')
@@ -64,9 +59,10 @@ def get_movies(id, piaofang):
     else:
         fen = ' '
     piaofang = piaofang
+    print(title,type,fangying,country,times,shangying_time,fen,piaofang)
     return (title,type,fangying,country,times,shangying_time,fen,piaofang)
 
-def get_actors(id):
+def get_actors(id): 
     url = "https://piaofang.maoyan.com/movie/{}/celebritylist".format(id)
     headers = {
         'Host': 'piaofang.maoyan.com',
@@ -81,17 +77,19 @@ def get_actors(id):
         'Pragma': 'no-cache',
         'Cache-Control': 'no-cache',
     }
-    res = requests.get(url=url,headers=headers)
+    res = requests.get(url=url, headers=headers, timeout=90)
     html = etree.HTML (res.text)
-    daoyans = html.xpath("/html/body/div/div/div[1]/div/dl[1]/dd/div/div/div/div[2]/p[1]/text()")
-    yanyuans = html.xpath('/html/body/div/div/div[1]/div/dl[2]/dd/div/div[1]/div[1]/div[2]/p[1]/text()')
-    if len(daoyans) == 0:
-        daoyans = [' ']
-    if len (yanyuans) == 0:
-       yanyuans = [' ']
-    return ('/'.join(daoyans),'/'.join(yanyuans))
-# print(res.text)
+    daoyan = html.xpath("//div[@id='导演']//div[@class='p-item-name']/text()")
+    yanyuan = html.xpath("//div[@id='演员']//div[@class='p-item-name']/text()")
 
+    daoyan = [item for item in daoyan if item.strip()]
+    yanyuan = [item for item in yanyuan if item.strip()]
+
+    if len(daoyan) == 0:
+        daoyan = [' ']
+    if len (yanyuan) == 0:
+       yanyuan = [' ']
+    return ('/'.join(daoyan),'/'.join(yanyuan))
 
 def get_company(id):
     url = "https://piaofang.maoyan.com/movie/{}/companylist".format (id)
@@ -108,13 +106,24 @@ def get_company(id):
         'Pragma': 'no-cache',
         'Cache-Control': 'no-cache',
     }
-    res = requests.get (url=url, headers=headers)
+    res = requests.get (url=url, headers=headers, timeout=90)
     html = etree.HTML (res.text)
-    chupin = html.xpath ("/html/body/div[2]/div/div/div[1]/dl[1]/dd/div/div/div/div[2]/p/text()")
-    lianhechupin = html.xpath ("/html/body/div[2]/div/div/div[1]/dl[2]/dd/div/div/div/div[2]/p/text()")
-    faxing = html.xpath ('/html/body/div[2]/div/div/div[1]/dl[3]/dd/div/div/div/div[2]/p/text()')
-    lianhefaxing = html.xpath ('/html/body/div[2]/div/div/div[1]/dl[4]/dd/div/div/div/div[2]/p/text()')
-    qita = html.xpath ('/html/body/div[2]/div/div/div[1]/dl[5]/dd/div/div/div/div[2]/p/text()')
+    chupin = html.xpath("//dl[contains(@class, 'panel-main') and contains(@class, 'category')]//span[@class='title-name' and contains(., '出品')]/ancestor::*[contains(@class, 'panel-main') and contains(@class, 'category')]//p[@class='p-item-name ellipsis-1']/text()")
+    lianhechupin = html.xpath("//dl[contains(@class, 'panel-main') and contains(@class, 'category')]//span[@class='title-name' and contains(., '联合出品')]/ancestor::*[contains(@class, 'panel-main') and contains(@class, 'category')]//p[@class='p-item-name ellipsis-1']/text()")
+    faxing = html.xpath("//dl[contains(@class, 'panel-main') and contains(@class, 'category')]//span[@class='title-name' and contains(., '发行')]/ancestor::*[contains(@class, 'panel-main') and contains(@class, 'category')]//p[@class='p-item-name ellipsis-1']/text()")
+    lianhefaxing = html.xpath("//dl[contains(@class, 'panel-main') and contains(@class, 'category')]//span[@class='title-name' and contains(., '联合发行')]/ancestor::*[contains(@class, 'panel-main') and contains(@class, 'category')]//p[@class='p-item-name ellipsis-1']/text()")
+    qita = html.xpath("//p[@class='p-item-name ellipsis-1']/text()")
+
+    chupin = [item for item in chupin if item.strip()]
+    lianhechupin = [item for item in lianhechupin if item.strip()]
+    faxing = [item for item in faxing if item.strip()]
+    lianhefaxing = [item for item in lianhefaxing if item.strip()]
+    qita = [item for item in qita if item.strip()]
+    for c in lianhechupin:
+        if c in chupin: chupin.remove(c)
+    for lf in lianhefaxing:
+        if lf in faxing: faxing.remove(lf)
+
     if len(chupin) == 0:
         chupin =[' ']
     if len(lianhechupin) == 0:
@@ -127,11 +136,7 @@ def get_company(id):
         qita = [' ']
     return ('/'.join(chupin),'/'.join(lianhechupin),'/'.join(faxing),'/'.join(lianhefaxing),'/'.join(qita))
 
-
-# print(res.text)
-import time
-import os
-if __name__ == '__main__':
+if __name__ == "__main__":
     txt_lis = os.listdir('txt')
     for txt in txt_lis:
         workbook = xlsxwriter.Workbook('{}_movies.xls'.format(txt.replace('.txt','')))
@@ -139,54 +144,29 @@ if __name__ == '__main__':
         cols = ['电影名称','电影类型','放映格式','制片国家和地区','时长','上映时间','评分','累计票房','导演','演员','出品公司','联合出品','放映公司','联合放映公司','其他','id']
         for i in range(16):
             worksheet.write(0,i,cols[i])
-        with open('txt\{}.txt'.format(txt.replace('.txt','')),'r') as f:
+        with open('txt/{}.txt'.format(txt.replace('.txt','')),'r') as f:
             all = f.readlines()
             all = [i.replace('\n','').split(' ') for i in all]
             index = 1
             for i in all:
-                print(i)
-                try:
-                    # title,type,fangying,country,times,shangying_time,fen,piaofang = get_movies(i[0],i[2])
-                    # daoyan,yanyuan = get_actors(i[0])
-                    # chupin,lianhechupin,fangying,lianhefangying,qita = get_company(i[0])
-                    movie_data = get_movies(i[0],i[2])
-                    actor_data = get_actors(i[0])
-                    company_data = get_company(i[0])
-                    all = list(movie_data) + list(actor_data) + list(company_data) + [i[0]]
-                    for i in range(15):
-                        worksheet.write (index, i, str(all[i]))
-                    # with open('2011_movie.txt','a+') as f:
-                    #     f.write('*'.join(all))
-                    #     f.write('/n')
-                    print(all)
-                    index +=1
-                except Exception as e:
-                    print(e)
-                    # with open('error.txt','a+',encoding='utf-8') as f:
-                    #     f.write(i[0])
-                    #     f.write('\n')
+                time.sleep(1)
+                try_times = 0
+                while True: # 失败的一直重试
+                    try:
+                        if try_times > 3: 
+                            print('try 3 times, break.', i)
+                            break
+                        movie_data = get_movies(i[0],i[2])
+                        actor_data = get_actors(i[0])
+                        company_data = get_company(i[0])
+                        all = list(movie_data) + list(actor_data) + list(company_data) + [i[0]]
+                        for i in range(15):
+                            worksheet.write(index, i, str(all[i]))
+                        print('all', all)
+                        index +=1
+                        break
+                    except Exception as e:
+                        try_times += 1
+                        time.sleep(7)
+                        print(e)
             workbook.close()
-
-    #
-    # cols = ['电影名称','电影类型','放映格式','制片国家和地区','时长','上映时间','评分','累计票房','导演','演员','出品公司','联合出品','放映公司','联合放映公司','其他']
-    # with open ('all_movies.txt', 'r') as f:
-    #     all = f.readlines ()
-    #     all = [i.replace ('\n', '').split (' ') for i in all]
-    # def process(i):
-    #     try:
-    #         # title,type,fangying,country,times,shangying_time,fen,piaofang = get_movies(i[0],i[2])
-    #         # daoyan,yanyuan = get_actors(i[0])
-    #         # chupin,lianhechupin,fangying,lianhefangying,qita = get_company(i[0])
-    #         movie_data = get_movies(i[0],i[2])
-    #         actor_data = get_actors(i[0])
-    #         company_data = get_company(i[0])
-    #         all = list(movie_data) + list(actor_data) + list(company_data)
-    #         with open('result.txt','a+',encoding='utf-8') as f:
-    #             f.write('*'.join(all))
-    #             f.write('\n')
-    #     except:
-    #         with open('error.txt','a+',encoding='utf-8') as f:
-    #             f.write(i[0])
-    #             f.write('\n')
-    # pools = ThreadPoolExecutor(max_workers=1)
-    # pools.map(process,all)
